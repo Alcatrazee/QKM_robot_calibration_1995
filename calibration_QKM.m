@@ -1,6 +1,6 @@
 %% close all unecessary windows
 close all
-%clear;
+clear;
 clc
  
 %% referenrce frame establisment
