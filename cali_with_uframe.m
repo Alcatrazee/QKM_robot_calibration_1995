@@ -3,7 +3,7 @@
 % RoboDK. This program can calibrate the robot automatically, with randomly
 % generated joint angles, this program can reduce the composition to less
 % than 1e-10.
-% How to use it: open  RoboDK file(QKM_robot_with_calibration_plate.rdk),
+% How to use it: open  RoboDK file(calibration_QKM_uframe.rdk),
 % then run this script.
 
 %% close all unecessary windows
