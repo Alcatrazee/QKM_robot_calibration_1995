@@ -28,40 +28,55 @@ w_vec_0 = [0 0 1;
            1 0 0]';
 %% g_st0 calculation(or M matrix from Park's paper)
 SMR_initial_file_name = 'init_SMRs.txt';
-angles_initial_file_name = 'init_ang.txt';
-[g_st0,~] = retrive_data(SMR_initial_file_name,angles_initial_file_name);   % read initial EE posture
-g_st0_in_tracker = g_st0;
-g_st0 = T_tracker_ref\g_st0;                                                % represents in reference frame
+data_init = importdata(SMR_initial_file_name);
+Pc0 = T_tracker_ref\[data_init(1,:) 1]';                                           % represents in reference frame
 
 % calculate log(g_st0)
-theta_M = norm(log_my(g_st0));
-normed_M = log_my(g_st0)/theta_M;       
-normed_M(1:3) = normed_M(1:3) - normed_M(1:3)'*normed_M(4:6)*normed_M(4:6);
+% theta_M = norm(log_my(Pc0));
+% normed_M = log_my(Pc0)/theta_M;       
+% normed_M(1:3) = normed_M(1:3) - normed_M(1:3)'*normed_M(4:6)*normed_M(4:6);
 
 %% norminal twist_matrix_0; size = 6 x 7
 % twist_iden = get_twist_from_rotations();
 % twist_matrix_0 = [twist_iden normed_M];
-twist_matrix_0 = [[cross(q_vec_0,w_vec_0);w_vec_0],normed_M];               % nominal twist
+% twist_matrix_0 = [[cross(q_vec_0,w_vec_0);w_vec_0],normed_M];               % nominal twist
+twist_matrix_0 = [cross(q_vec_0,w_vec_0);w_vec_0];  
 twist_matrix_copy = twist_matrix_0;
 
 %% read SMR positions and joint angles from files
+% data_file_name = 'POSES.txt';
+% angle_file_name = 'AnglesInDeg.txt';
+% [samples,theta_random_vec] = retrive_data(data_file_name,angle_file_name);  % read and process into postures of end effector
+% theta_random_vec = deg2rad(theta_random_vec);
+% num_of_pts = length(theta_random_vec);  
+% theta_random_vec(:,7) = ones(num_of_pts,1)*theta_M;                         % the 7th column shall be set to thetaM
+% theta_random_vec(:,3) = theta_random_vec(:,3) - ones(num_of_pts,1)*pi/2;
+
 data_file_name = 'POSES.txt';
 angle_file_name = 'AnglesInDeg.txt';
-[samples,theta_random_vec] = retrive_data(data_file_name,angle_file_name);  % read and process into postures of end effector
+theta_random_vec = importdata(angle_file_name);
 theta_random_vec = deg2rad(theta_random_vec);
-num_of_pts = length(theta_random_vec);  
-theta_random_vec(:,7) = ones(num_of_pts,1)*theta_M;                         % the 7th column shall be set to thetaM
+num_of_pts = length(theta_random_vec); 
 theta_random_vec(:,3) = theta_random_vec(:,3) - ones(num_of_pts,1)*pi/2;
+datas = importdata(data_file_name);
+size_of_data =  size(datas);
+Pc_temp = zeros(num_of_pts,3);
+for i=1:num_of_pts
+    Pc_temp(i,:) = datas(i*3-2,:);
+end
 
 % transfor SMR position into reference frame.
+Pc = zeros(num_of_pts,4);
 for i=1:num_of_pts
-    samples(:,:,i) = T_tracker_ref\samples(:,:,i);
+    Pc(i,:) = T_tracker_ref\[Pc_temp(i,:) 1]';
+%     samples(:,:,i) = T_tracker_ref\samples(:,:,i);
 end
 
 %% variables declaration
-df_f_inv = zeros(num_of_pts*6,1);                                           % df*f^-1
-dp = zeros(num_of_pts*6,1);                                                 % deviation of configuration parameters
-A = zeros(num_of_pts*6,42);                                                 % A matrix
+df_f_inv = zeros(num_of_pts*3,1);                                           % df*f^-1
+d_eta_matrix = zeros(6*7,1);                                                 % deviation of configuration parameters
+current_eta_matrix = zeros(42,1);
+A = zeros(num_of_pts*3,42);                                                 % A matrix
 j = 0;                                                                      % iteration time
 norm_dp=[];                                                                 % for norm of dp visialization
 Jacobian = zeros(6,6);
@@ -69,18 +84,18 @@ Jacobian = zeros(6,6);
 while j<20
     %% calculate A matrix and df*f^-1 (parameters identification)
     for i=1:num_of_pts                                                      % repeat num_of_pts times
-        [T_n,~,T_n_abs] = FK_new(twist_matrix_0,theta_random_vec(i,:));           % Tn calculation
-        T_a = samples(:,:,i);                                               % in this case,we have ee postures represent in reference frame
-        A(1+i*6-6:i*6,:) = A_matrix(twist_matrix_0,theta_random_vec(i,:));  % A matrix calculation
-        df_f_inv(1+i*6-6:i*6) = log_my(T_a/T_n);                            % solve for log(df_f_inv)
+        [T,~,~] = FK_new_points(twist_matrix_0,theta_random_vec(i,:));           % Tn calculation
+        Pcn = T*Pc0;
+        Pca = Pc(i,:)';                                               % in this case,we have ee postures represent in reference frame
+        A(i:3-2:i*3,:) = Ai_Tilde(twist_matrix_0,theta_random_vec(i,:),Pca,current_eta_matrix,d_eta_matrix);
+        df_f_inv(i*3-2:i*3) = Pca - Pcn;
+%         df_f_inv(1+i*6-6:i*6) = log_my(Pca'/Pcn);                            % solve for log(df_f_inv)
 %         for k = 1:6
 %             Jacobian(:,k) = vee(T_n_abs(:,:,k)*hat(twist_matrix_0(:,k)));
 %         end
 %         det(Jacobian)
     end
-    
-    condition_number = norm(A)*norm(pinv(A))
-    dp = A\df_f_inv;                                                        % solve for dp(derive of twist)
+    d_eta_matrix = A\df_f_inv;                                                        % solve for dp(derive of twist)
     %% composition
     for i=1:6
         twist_matrix_0(:,i) = twist_matrix_0(:,i) + dp(1+i*6-6:i*6,1);                                                          % composition

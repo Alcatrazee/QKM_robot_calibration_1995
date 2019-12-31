@@ -62,7 +62,7 @@ twist_matrix_copy = twist_matrix_0;
 %% read SMR positions and joint angles from files
 num_of_pts = 10;
 % theta_random_vec = GetRandomAngles(num_of_pts);
-theta_random_vec = importdata('nice_angles.txt');
+theta_random_vec = importdata('test_angles.txt');
 theta_random_vec_deg = rad2deg(theta_random_vec);
 theta_random_vec(:,7) = ones(num_of_pts,1)*theta_M;                         % the 7th column shall be set to thetaM
 samples = MeasurePosture(theta_random_vec_deg,num_of_pts);
@@ -102,7 +102,7 @@ while j<20
     norm_dp = [norm_dp norm(dp)];                                           % minimization target value calculation
     disp ([num2str(j) 'th iteration'])                                                 % show number of iteration
     disp (norm(dp))                                                         % show value of norm of dp
-    if norm(dp) < 1e-10                                                  	% quit the for loop if deviation is less than 1e-5
+    if norm(dp) < 1e-9                                                  	% quit the for loop if deviation is less than 1e-5
         break;
     end
     %% plot
@@ -117,7 +117,7 @@ bar3(norm_dp)                                                               % pl
 %% verify the new twist
 num_of_test_points = 10;
 %test_angles = GetRandomAngles(num_of_test_points);                          % generate new points
-test_angles = importdata('test_angles.txt');
+test_angles = importdata('nice_angles.txt');
 test_angles_deg = rad2deg(test_angles);                                     % you know what it is
 test_angles(:,7) = ones(num_of_test_points,1)*theta_M;                      % the 7th column shall be set to thetaM
 truth_poses = MeasurePosture(test_angles_deg,num_of_test_points);           % launch sim on RoboDK for data
