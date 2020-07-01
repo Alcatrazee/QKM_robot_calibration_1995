@@ -1,3 +1,7 @@
+%% statements 
+% This script is a implimentation of calibration algorithm of Park's on QKM
+% HL6(6 axis robot)
+
 %% close all unecessary windows
 close all
 clear;
@@ -73,13 +77,7 @@ while j<20
         T_a = samples(:,:,i);                                               % in this case,we have ee postures represent in reference frame
         A(1+i*6-6:i*6,:) = A_matrix(twist_matrix_0,theta_random_vec(i,:));  % A matrix calculation
         df_f_inv(1+i*6-6:i*6) = log_my(T_a/T_n);                            % solve for log(df_f_inv)
-%         for k = 1:6
-%             Jacobian(:,k) = vee(T_n_abs(:,:,k)*hat(twist_matrix_0(:,k)));
-%         end
-%         det(Jacobian)
     end
-    
-    condition_number = norm(A)*norm(pinv(A))
     dp = A\df_f_inv;                                                        % solve for dp(derive of twist)
     %% composition
     for i=1:6
